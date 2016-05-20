@@ -10,16 +10,19 @@ ARCH        := $(shell uname -m)
 SHELL       := /bin/bash
 
 ###############################################################################
-EXEFILE     := pbF12
+EXEFILE1    := polin
+EXEFILE2    := polel
 
 SRCDIR      := src
 INCDIR      := src
 OBJDIR      := obj.$(ARCH)
 
-MAINFILE    := pbF12.cc
+MAINFILE1   := polin.f
+MAINFILE2   := polel.f
 
 INCDIRS     := $(INCDIR)
-MAINOBJ     := $(OBJDIR)/$(addsuffix .o,$(basename $(MAINFILE)))
+MAINOBJ1    := $(OBJDIR)/$(addsuffix .o,$(basename $(MAINFILE1)))
+MAINOBJ2    := $(OBJDIR)/$(addsuffix .o,$(basename $(MAINFILE2)))
 
 ###############################################################################
 # Compiler
@@ -37,20 +40,18 @@ else
     MODE    := -m64
 endif
 INCFLAGS    := $(addprefix -I,$(INCDIRS))
-CFLAGS      := -Wall -fPIC -Wno-unused-variable -O3 -g $(MODE) $(INCFLAGS)
-CXXFLAGS    := -Wall -fPIC -Wno-unused-variable -O3 -g $(MODE) $(INCFLAGS)
-FFLAGS      := -Wall -fPIC -Wno-unused-variable -O3 -g $(MODE) $(INCFLAGS)
+CFLAGS      := -Wall -fPIC -Wno-unused-variable -g $(MODE) $(INCFLAGS)
+CXXFLAGS    := -Wall -fPIC -Wno-unused-variable -g $(MODE) $(INCFLAGS)
+FFLAGS      := -Wall -fPIC -Wno-unused-variable -g $(MODE) $(INCFLAGS)
 ifeq ($(MYOS),Darwin) #in Darwin, do not use -fno-leading-underscore
-    FFLAGS  += -fno-second-underscore -fno-automatic -fbounds-check \
-               -funroll-all-loops -fdollar-ok -ffixed-line-length-none \
-               -fno-range-check
+    FFLAGS  += -fno-second-underscore -fbounds-check \
+               -ffixed-line-length-none
 else
     FFLAGS  += -fno-leading-underscore -fno-second-underscore \
-               -fno-automatic -fbounds-check -funroll-all-loops \
-               -fdollar-ok -ffixed-line-length-none -fno-range-check
+               -fbounds-check -ffixed-line-length-none
 endif
 CPPFLAGS    :=
-LDFLAGS     := -O3 -g $(MODE)
+LDFLAGS     := -g $(MODE)
 
 ###############################################################################
 # Generate file lists
@@ -72,7 +73,7 @@ DEPS        := $(subst .o,.d,$(OBJS))
 
 ###############################################################################
 # Libraries
-SYSLIBS     := -lstdc++ -lm -lgfortran
+SYSLIBS     := -lgfortran
 LIBS        += $(SYSLIBS)
 
 ###############################################################################
@@ -118,20 +119,27 @@ VPATH       := $(SRCDIR)
 .SUFFIXES: .h .hh .H .HH
 .SUFFIXES: .o .d
 
-.PHONY: all exe
+.PHONY: all exe1 exe2
 .PHONY: clean distclean
 .PHONY: test help env
 
 ###############################################################################
-all: exe
+all: exe1 exe2
 
 ###############################################################################
-exe: $(OBJS) $(MAINOBJ)
-	@$(LD) $(LDFLAGS) -o $(EXEFILE) $(OBJS) $(MAINOBJ) $(LIBS)
-	@echo "Linking $(EXEFILE) ...... done!"
+exe1: $(OBJS) $(MAINOBJ1)
+	@$(LD) $(LDFLAGS) -o $(EXEFILE1) $(OBJS) $(MAINOBJ1) $(LIBS)
+	@echo "Linking $(EXEFILE1) ...... done!"
 
-$(MAINOBJ): $(MAINFILE)
-	@$(compile-cxx)
+exe2: $(OBJS) $(MAINOBJ2)
+	@$(LD) $(LDFLAGS) -o $(EXEFILE2) $(OBJS) $(MAINOBJ2) $(LIBS)
+	@echo "Linking $(EXEFILE2) ...... done!"
+
+$(MAINOBJ1): $(MAINFILE1)
+	@$(compile-fc)
+
+$(MAINOBJ2): $(MAINFILE2)
+	@$(compile-fc)
 
 ###############################################################################
 # Make dependencies
@@ -186,7 +194,7 @@ $(OBJDIR)/%.o: %.F
 ###############################################################################
 # Clean
 clean:
-	@rm -f $(EXEFILE)
+	@rm -f $(EXEFILE1) $(EXEFILE2)
 	@rm -f $(OBJDIR)/*
 	@rm -f *~ *# */*~ */*#
 

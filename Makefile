@@ -3,16 +3,22 @@ ARCH        := $(shell uname -m)
 USER        := $(shell whoami)
 MYHOST      := $(shell hostname -s)
 
-.PHONY: all pbF12 clean
+.PHONY: all clean pb polint
 
-all: pbF12
+all: pb polint
 
-pbF12:
+pb:
 	@make -s -C pb
 	@ln -sf pb/pbF12 pbF12
 
+polint:
+	@make -s -C polint
+	@ln -sf polint/polel polel
+	@ln -sf polint/polin polin
+
 clean:
-	@rm -f pbF12
+	@rm -f pbF12 polel polin
 	@make clean -s -C pb
+	@make clean -s -C polint
 
 distclean: clean

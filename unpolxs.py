@@ -43,10 +43,10 @@ class unpolxs():
         self.tb = 0.02249 + 0.04138/2. * 0
 
     # do not call after choose_WQ2
-    def calxs(self, pn=0):
-        M = self.mp if pn == 0 else self.mn
+    def calxs(self):
+        M = self.mp
 
-        data={}
+        data = {}
         data['W'] = np.zeros(self.NQ2 * self.NW, dtype = 'float32')
         data['Q2'] = np.zeros(self.NQ2 * self.NW, dtype = 'float32')
         data['nu'] = np.zeros(self.NQ2 * self.NW, dtype = 'float32')
@@ -71,7 +71,7 @@ class unpolxs():
 
         return data
 
-    def calxsrad(self, pn=0):
+    def calxsrad(self):
         if not self.data:
             self.calxs()
 
@@ -242,7 +242,7 @@ class unpolxs():
         return PBdata
 
     # mott cross section
-    def __mott(self, E, theta):
+    def _mott(self, E, theta):
         return self.alpha**2 * self.hc2 * np.cos(theta / 2.)**2 / (4 * E**2 * np.sin(theta / 2.)**4) # (1,17)
 
     # unpol cross section
@@ -256,7 +256,7 @@ class unpolxs():
         sin2thd2, cos2thd2, tan2thd2 = self.trigo(theta)
         Q2 = 4 * E * E2 * sin2thd2
         W = np.sqrt(M**2 + 2 * M * nu - Q2)
-        mott = self.__mott(E, theta)
+        mott = self._mott(E, theta)
         pbdata = self.__pbf12(Q2, W, Z, A, filename, dumpfile)
         dxs_i = self.__unpol(mott, pbdata['PBF1_i'], pbdata['PBF2_i'], nu, tan2thd2, M)
         dxs_q = self.__unpol(mott, pbdata['PBF1_q'], pbdata['PBF2_q'], nu, tan2thd2, M)
@@ -335,7 +335,7 @@ class unpolxs():
         eta, b, T, epsilon = self.__fetepbT(Z)
         sin2thd2, cos2thd2, tan2thd2 = self.trigo(theta)
         Eel = E / (1 + (2 * E / M) * sin2thd2) # elastic peak, (1,A4)
-        mott = self.__mott(E, theta)
+        mott = self._mott(E, theta)
         Q2 = 4 * E * Eel * sin2thd2
         W2, W1 = self.__elform(Q2, Z, A, M)
         spence = scipy.special.spence(cos2thd2) # (1,A48)
@@ -343,9 +343,64 @@ class unpolxs():
         F = self.__fVF(Q2, E, Eel, b, T, spence)
         return F * xs
 
+    # elastic asym, LT = 0 long, 1 tran. only for proton
+    # hacked from sub_rtail.f
+    def asymel(self, E, theta, LT):
+        M = self.mp
+        me = self.me
+        sin2thd2, cos2thd2, tan2thd2 = self.trigo(theta)
+        E2 = E / (1 + (2 * E / M) * sin2thd2) # elastic peak, (1,A4)
+        me2 = me * me
+        nu = E - E2
+        M2 = M * M
+        Q2 = 2 * M * nu
+        S = 2 * M * np.sqrt(E * E + me2) # (7,S)
+        lambdas = S * S - 4 * me2 * M2 # (7,6)
+        GE, GM = self.__elform(Q2, 1, 1, M, True)
+        #GE = 1.2742 / (1. + Q2GeV / 0.6394**2) - .2742 / (1. + Q2GeV / 1.582**2)
+        #GM = (1.3262 / (1. + Q2GeV / 0.6397**2) - .3262 / (1. + Q2GeV / 1.3137**2)) * 2.7921 # GE GM from sub_rtails
+        tau = Q2 / (4 * M2)
+        F1 = 4 * tau * M2 * GM * GM # (7,11)
+        F2 = 4 * M2 * (GE * GE + tau * GM * GM) / (1 + tau) # (7,11)
+        F3 = -2 * M2 * GE * GM # (7,18)
+        F4 = -M2 * GM * (GE - GM) / (1 + tau) # (7,18)
+        X = S-Q2 # (7,below 20), then Sx = S - X = Q2
+        Sx = Q2 # (7,above 20), Sx = S - X
+        lambdaq = Sx * Sx + 4 * M2 * Q2 # (7,below 19)
+        lambda0  = S * X * Q2 - me2 * lambdaq - M2 * Q2 * Q2 # (7,below 19,lambda)
+        sqlq = np.sqrt(lambdaq)
+        sql0 = np.sqrt(lambda0)
+        sqls = np.sqrt(lambdas)
+        ym = Q2 + 2 * me2
+        a_s = S / (2 * me * sqls)
+        b_s = 0
+        c_s = -me / sqls
+        if LT == 0:
+            ae, be, ce = M / sqls, 0, -S / (2 * M * sqls)
+        else:
+            ae = (-S * X + 2 * M2 * ym) / (2 * sql0 * sqls)
+            be = sqls / (2 * sql0)
+            ce = -(S * Q2 + 2 * me2 * Sx) / (2 * sqls * sql0)
+        apq = -Q2 * (ae - be) + ce * Sx
+        apn = (Q2 + 4 * me2) * (ae + be) + ce * (S + X)
+        dk2ks = a_s * ym + 2 * me2 * b_s + c_s * X
+        dksp1 = a_s * S + b_s * X + c_s * 2 * M2
+        dapks = 2 * (2 * me2 * (a_s * ae + b_s * be) + 2 * M2 * c_s * ce + ym * (a_s * be + b_s * ae) + S * (a_s * ce + c_s * ae) + X * (b_s * ce + c_s * be))
+        thB1 = Q2-2 * me2 # (7,12)
+        thB2 = (S * X - M2 * Q2)/(2 * M2) # (7,13)
+        thB3 = (2. * (apq * dk2ks - dapks * Q2) * me) / M # (7,21)
+        thB4 = apq * Q2 * me * (2. * dksp1 - dk2ks) / (M2 * M) # (7,21)
+        sig0 = 2 * np.pi * self.alpha ** 2 / (S * S * Q2 * Q2)
+        sig_unpol = sig0 * (thB1 * F1 + thB2 * F2) # (7,14h)
+        sig_pol = sig0 * (thB3 * F3 + thB4 * F4)
+        return sig_pol / sig_unpol
+
     # inelastic radiate correction
     # E, E2: energy of in, out electron (MeV), theta: scat angle (rad)
-    def inelastic(self, xskey='', Z=1, A=1, nodump=False):
+    def inelastic(self, xskey='', Z=1, A=1, pol=0, nodump=False):
+        if pol == 1 and A != 1:
+            print 'polarized radiative correction only work for proton!'
+
         MT = self.mass(Z, A)
         eta, b, T, epsilon = self.__fetepbT(Z)
         dE = 10 # (1,A83m),(2,3)
@@ -357,8 +412,8 @@ class unpolxs():
         # 1st term (1,A82)
         E2 = self.E - nu
         R = self.__fR(self.E, E2, MT, sin2thd2)
-        tr = self.__fVtr(Q2, b)
-        F = self.__fVF(Q2, self.E, E2, b, T, spence)
+        tr = self.__fVtr(Q2, b, pol)
+        F = self.__fVF(Q2, self.E, E2, b, T, spence, pol)
         xsrad_11 = np.power(R * dE / self.E, b * (self.tb + tr))
         xsrad_12 = np.power(dE / E2, b * (self.ta + tr))
         xsrad_13 = 1 - epsilon / dE / (1 - b * (T + 2 * tr))
@@ -373,23 +428,29 @@ class unpolxs():
                 Ep = Emin + i * Estep
                 VQ2 = 4 * Ep * Eb * sin2thd2
                 dEp = (Ep - Ea) * rev
-                tr = self.__fVtr(VQ2, b)
-                VF = self.__fVF(VQ2, self.E, E2, b, T, spence)
+                tr = self.__fVtr(VQ2, b, pol)
+                VF = self.__fVF(VQ2, self.E, E2, b, T, spence, pol)
 
                 if rev < 0:
-                    #F = self.__fVF(VQ2, Ep, Eb, b, T, spence)
+                    #F = self.__fVF(VQ2, Ep, Eb, b, T, spence, pol)
                     dEpp = dEp / Ea
                     tar, tbr = self.tb + tr, self.ta + tr
                     #VR = self.__fR(Ep, Eb, MT, sin2thd2)
                     EI2 = np.power(dEp / (Eb * R), b * tbr)
-                    xs = self.xspb(Ep, Eb, theta, Z, A, '{}{}'.format(i, rev))
+                    if pol == 0:
+                        xs = self.xspb(Ep, Eb, theta, Z, A, '{}{}'.format(i, rev))
+                    else:
+                        xs = self.choose_nuth(Ep - Eb, theta, [xskey], nodump)[xskey]
                 else:
-                    #F = self.__fVF(VQ2, Eb, Ep, b, T, spence)
+                    #F = self.__fVF(VQ2, Eb, Ep, b, T, spence, pol)
                     dEpp = dEp / Ep
                     tar, tbr = self.ta + tr, self.tb + tr
                     #VR = self.__fR(Eb, Ep, MT, sin2thd2)
                     EI2 = np.power(dEp * R / Eb, b * tbr)
-                    xs = self.xspb(Eb, Ep, theta, Z, A, '{}{}'.format(i, rev))
+                    if pol == 0:
+                        xs = self.xspb(Eb, Ep, theta, Z, A, '{}{}'.format(i, rev))
+                    else:
+                        xs = self.choose_nuth(Eb - Ep, theta, [xskey], nodump)[xskey]
 
                 EI1 = np.power(dEpp, b * tar)
                 EI3 = self.__fphiv(dEpp) * b * tar / dEp + epsilon / (2 * dEp**2)
@@ -413,7 +474,11 @@ class unpolxs():
         return xsrad_1 + xsrad_2 + xsrad_3
 
     # elastic tail, extern bremmsstrahlung, and peaking approximation for internal bremmstrahlung (unpol only)
-    def elastic(self, xskey='', Z=1, A=1):
+    def elastic(self, xskey='', Z=1, A=1, pol=0):
+        if pol == 1 and A != 1:
+            print 'polarized radiative correction only work for proton!'
+        LT = 1 if 'T' in xskey else 0
+
         MT = self.mass(Z, A)
         eta, b, T, epsilon = self.__fetepbT(Z)
         Q2, nu, tmp = self.__kins(xskey, Z, A)
@@ -426,6 +491,10 @@ class unpolxs():
         nup = omegap / (E2 + omegap) # (1,A53)
         xsel_s = self.xsel(self.E, theta, Z, A)
         xsel_sm = self.xsel(self.E - omegas, theta, Z, A)
+        if pol == 1:
+            # elastic differential cross section = asym * xs_unpol
+            xsel_s *= self.asymel(self.E, theta, LT)
+            xsel_sm *= self.asymel(self. E - omegas, theta, LT)
         bphos = b * self.__fphiv(nus) / omegas
         bphop = b * self.__fphiv(nup) / omegap
 
@@ -434,7 +503,10 @@ class unpolxs():
         term2 = bphop * self.ta + epsilon/ 2 / omegap**2
         xsb = term11 * xsel_sm * term12 + xsel_s * term2 # extern bremmsstrahlung (1,A49)
         tr = self.__fVtr(Q2,b)
-        xsp = term11 * xsel_sm * bphos * tr + xsel_s * bphop * tr # peaking approximation (1,A56)
+        if pol == 0:
+            xsp = term11 * xsel_sm * bphos * tr + xsel_s * bphop * tr # peaking approximation (1,A56)
+        else:
+            xsp = 0
         Fsoft = np.power(omegas / self.E, b * (self.tb + tr)) * np.power(omegap / (E2 + omegap), b * (self.ta + tr)) # Multiple-photon correction #(1,A58)
         return xsb * Fsoft, xsp * Fsoft
 
@@ -459,22 +531,26 @@ class unpolxs():
         return (M + 2 * E * sin2th) / (M - 2 * E2 * sin2th) # (1,A83)
 
     # tr from (1,A57)
-    def __fVtr(self, VQ2, b):
+    def __fVtr(self, VQ2, b, pol=0):
+        if pol == 1:
+            return 0
         logQ2me = np.log(VQ2 / self.me**2)
         return 1. / b * self.alphapi * (logQ2me - 1) # (1,A57)
 
     # F from (1,A44)
-    def __fVF(self, VQ2, VE, VE2, b, T, spence):
+    def __fVF(self, VQ2, VE, VE2, b, T, spence, pol=0):
         logQ2me = np.log(VQ2 / self.me**2)
-        VF = self.__fVF_noQ2(b, T, spence)
-        logEE2 = np.log(VE / VE2)**2
-        VF = self.__fVF_2(logQ2me, logEE2, VF)
+        VF = self.__fVF_noQ2(b, T, spence, pol)
+        if pol == 0:
+            logEE2 = np.log(VE / VE2)**2
+            VF = self.__fVF_2(logQ2me, logEE2, VF)
         return VF
 
     # stripped Q2, E, EF for F
-    def __fVF_noQ2(self, b, T, spence):
+    def __fVF_noQ2(self, b, T, spence, pol):
         VF = 1 + 0.5772 * b * T
-        VF = VF + self.alphapi * (np.pi**2 / 6. - spence) - 2 * self.alphapi * 14. / 9. # (1,A44)
+        if pol == 0:
+            VF = VF + self.alphapi * (np.pi**2 / 6. - spence) - 2 * self.alphapi * 14. / 9. # (1,A44)
         return VF
 
     # F from (1,A44) with input of 2nd vars
