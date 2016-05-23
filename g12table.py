@@ -6,7 +6,7 @@ import numpy as np
 try:
     from tools import zload
 except:
-    from pyradxs import zload
+    from pyg2pasym import zload
 
 Ebeam = int(sys.argv[1])
 data = zload('data/asym_{}.pkl'.format(Ebeam))

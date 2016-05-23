@@ -440,7 +440,7 @@ class unpolxs():
                     if pol == 0:
                         xs = self.xspb(Ep, Eb, theta, Z, A, '{}{}'.format(i, rev))
                     else:
-                        xs = self.choose_nuth(Ep - Eb, theta, [xskey], nodump)[xskey]
+                        xs = self.choose_nuth(Ep - Eb, theta, [xskey], nodump=True)[xskey]
                 else:
                     #F = self.__fVF(VQ2, Eb, Ep, b, T, spence, pol)
                     dEpp = dEp / Ep
@@ -450,7 +450,7 @@ class unpolxs():
                     if pol == 0:
                         xs = self.xspb(Eb, Ep, theta, Z, A, '{}{}'.format(i, rev))
                     else:
-                        xs = self.choose_nuth(Eb - Ep, theta, [xskey], nodump)[xskey]
+                        xs = self.choose_nuth(Eb - Ep, theta, [xskey], nodump=True)[xskey]
 
                 EI1 = np.power(dEpp, b * tar)
                 EI3 = self.__fphiv(dEpp) * b * tar / dEp + epsilon / (2 * dEp**2)
@@ -514,7 +514,10 @@ class unpolxs():
     def __kins(self, xskey='', Z=1, A=1):
         Q2 = self.data['Q2']
         nu = self.data['nu']
-        xs = self.data['dxs{}{}'.format(Z, A)]
+        if xskey == '':
+            xs = self.data['dxs{}{}'.format(Z, A)]
+        else:
+            xs = self.data[xskey]
         return Q2, nu, xs
 
     # eta, b, epsilon, T from (1,A45-47,52)

@@ -8,7 +8,7 @@ from multiprocessing.dummy import Pool as tp
 try:
     from tools import zload, zdump, Q2range, Wrange
 except:
-    from pyradxs import zload, zdump, Q2range, Wrange
+    from pyg2pasym import zload, zdump, Q2range, Wrange
 
 class maiddown:
     def __init__(self):

@@ -17,7 +17,7 @@ from unpolxs import unpolxs
 # Physics Reports.378.99 5
 # constant from pdg 2010
 
-class asym(unpolxs):
+class asymmetry(unpolxs):
     def __init__(self, Ebeam=2253):
         # constant
         unpolxs.__init__(self, Ebeam)
@@ -88,7 +88,7 @@ class asym(unpolxs):
         mott = self._mott(self.E, self.data['theta'])
         alphaEQ = 4 * self.alpha**2 * E2 * self.hc2 / (self.data['nu'] * self.E * self.data['Q2'] * ma)
         self.data['dxsL11'] = alphaEQ * ((self.E + E2 * np.cos(self.data['theta'])) * self.data['g1'] - 2 * ma * self.data['x'] * self.data['g2']) # (4,1)
-        self.data['dxsT11'] = alphaEQ * E2 * np.sin(self.data['theta']) * (self.data['g1'] + 2*self.E * self.data['g2'] / self.data['nu']) # (4,2)
+        self.data['dxsT11'] = alphaEQ * E2 * np.sin(self.data['theta']) * (self.data['g1'] + 2 * self.E * self.data['g2'] / self.data['nu']) # (4,2)
 
     # radiate polarized dxsL or dxsT, LT = 0 for long, 1 for tran
     def calxsdfrad(self, LT, nodump=False):
@@ -107,14 +107,72 @@ class asym(unpolxs):
         self.data['{}_rad_el_ex'.format(xskey)] = xsel_ex
         self.data['{}_rad_el_in'.format(xskey)] = xsel_in
 
+    def choose_WQ2(self, W, Q2, keys, nodump=False):
+        if not self.data:
+            return False
+        Q2GeV = Q2 / 1.e6
+        Ws, Q2s, ids = id_WQ2(W, Q2GeV)
+
+        dhash = WQhash(W, Q2)
+        addkeys = ''
+        if keys:
+            addkeys = '_' + ''.join(keys)
+        pklpath = join(self.datadir, 'tmp/asym{}_{}.pkl'.format(addkeys, dhash))
+        if not nodump and exists(pklpath):
+            data = zload(pklpath)
+            if not keys:
+                self.data = data
+                return True
+            else:
+                return data
+
+        if len(self.data['W']) != self.Ndata:
+            odata = zload(self.save) # reload defaults
+        else:
+            odata = self.data
+
+        keysbak = keys
+        if not keys:
+            keys = odata.keys()
+
+        data = {}
+        # speed up radiation
+        self.relatedid = np.concatenate((self.relatedid, ids[0], ids[1], ids[2], ids[3]))
+        self.relatedid = np.unique(self.relatedid)
+
+        for k in keys:
+            # bilinear interpolation
+            d00 = odata[k][ids[0]]
+            d01 = odata[k][ids[1]]
+            d10 = odata[k][ids[2]]
+            d11 = odata[k][ids[3]]
+            Weq = (Ws[0] == Ws[1])
+            d0 = (Ws[1] - W) / (Ws[1] - Ws[0]) * d00 + (W - Ws[0]) / (Ws[1] - Ws[0]) * d10
+            d1 = (Ws[1] - W) / (Ws[1] - Ws[0]) * d01 + (W - Ws[0]) / (Ws[1] - Ws[0]) * d11
+            d0[Weq] = d00[Weq]
+            d1[Weq] = d01[Weq]
+            Q2eq = (Q2s[1] == Q2s[0])
+            d = (Q2s[1] - Q2GeV) / (Q2s[1] - Q2s[0]) * d0 + (Q2GeV - Q2s[0]) / (Q2s[1] - Q2s[0]) * d1
+            d[Q2eq] = d0[Q2eq]
+            data[k] = d
+        del odata
+
+        if not nodump:
+            zdump(data, pklpath)
+        if not keysbak:
+            self.data = data
+            return True
+        else:
+            return data
+
     # polarized radiative correction for inelastic internal
     # xsin is the xs after external rc
     def polin_intern(self, xskey, xsin, nodump=False):
         LT = 3 if 'T' in xskey else 1
 
-        fname = 'dxs'
+        fname = '{0}{0}{0}'.format('T' if LT == 3 else 'L')
         ohash = WQhash(self.data['W'], self.data['Q2'])
-        pklfile = join(self.datadir, 'pol/polin{}{}.pkl'.format(fname, ohash))
+        pklfile = join(self.datadir, 'pol/polin{}{}{}.pkl'.format(int(self.E), fname, ohash))
         if not nodump and exists(pklfile):
             return zload(pklfile)
 
@@ -154,9 +212,9 @@ class asym(unpolxs):
     def polel_intern(self, xskey, nodump=False):
         LT = 3 if 'T' in xskey else 1
 
-        fname = 'dxs'
+        fname = '{0}{0}{0}'.format('T' if LT == 3 else 'L')
         ohash = WQhash(self.data['W'], self.data['Q2'])
-        pklfile = join(self.datadir, 'pol/polel{}{}.pkl'.format(fname, ohash))
+        pklfile = join(self.datadir, 'pol/polel{}{}{}.pkl'.format(int(self.E), fname, ohash))
         if not nodump and exists(pklfile):
             return zload(pklfile)
 
