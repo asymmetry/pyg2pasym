@@ -1,7 +1,8 @@
-maiddown.py is used to download the MAID2007 cross-sections, which is required
-by the module. Please copy maiddown.py to your work dir and execute.
+maiddown.py downloads the MAID2007 cross-sections from their website.
 
-g12table.py is used to generate g1 and g2 tables to retrieve the polarized
-radiative correction. It requires the g1 and g2 to have been calculated already
-and saved in a pkl file. The script will read the pkl file and save the g1 and
-g2 values to a text file.
+datatable.py pre-calculates all form factors and cross-sections which will be
+used in the package.
+
+To use the package, make a symbolic link of the package in your working
+directory, copy the maiddown.py and datatable.py to the same directory and
+execute them in order.
