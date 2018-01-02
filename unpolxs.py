@@ -166,7 +166,7 @@ class unpolxs():
     # choose data, input is nu(MeV), Q2(MeV2) array
     def choose_nuQ2(self, nu, Q2, keys=False, nodump=False):
         W = np.sqrt(self.mp**2 + 2 * self.mp * nu - Q2)
-        return self.chooseWQ2(W, Q2, keys, nodump=nodump)
+        return self.choose_WQ2(W, Q2, keys, nodump=nodump)
 
     # mass of target
     def mass(self, Z, A):
