@@ -1,6 +1,6 @@
-## Python Module of g2p Asymmetry and Cross-Section Models
+## g2p Radiative Corrected Asymmetry and Cross-Section Models
 
-A python module of asymmetry and cross-section models for Jefferson Lab experiment E08-027 (g2p).
+Radiative corrected asymmetry and cross-section models for Jefferson Lab experiment E08-027 (g2p).
 
 Originally developed by Pengjia Zhu.
 

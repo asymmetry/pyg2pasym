@@ -7,7 +7,7 @@ try:
     from unpolxs import unpolxs
     from tools import zload
 except:
-    from pyg2pasym import asymmetry, unpolxs, zload
+    from pyg2prad import asymmetry, unpolxs, zload
 
 for E in [2253.5, 1710.5, 1157.0, 3350.5]:
     xs = unpolxs(E)
